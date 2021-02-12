@@ -51,6 +51,7 @@ for media_index, media in enumerate(result_json["extended_entities"]["media"]):
                 file.write(chunk)
                 pbar.update(len(chunk))
             pbar.close()
+            file.close()
     elif(media_type == "photo"):
         media_url = media["media_url_https"] + "?name=orig"
         print(media_url)
@@ -62,5 +63,6 @@ for media_index, media in enumerate(result_json["extended_entities"]["media"]):
                 file.write(chunk)
                 pbar.update(len(chunk))
             pbar.close()
+            file.close()
     else:
         print('Unsupported type "' + media_type + '"')
