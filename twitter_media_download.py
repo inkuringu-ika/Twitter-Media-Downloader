@@ -6,6 +6,46 @@ import urllib
 import sys
 import os
 
+if getattr(sys, 'frozen', False):
+    program_directory_path = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    program_directory_path = os.path.dirname(os.path.abspath(__file__))
+
+def get_authorization():
+    Authorization = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'
+    return Authorization
+
+def get_guest_token(Authorization):
+    print("Getting guest_token...")
+    if(os.path.isfile(program_directory_path + "/guest_token.json")):
+        f = open(program_directory_path + "/guest_token.json")
+        data = f.read()
+        f.close()
+        data_json = json.loads(data)
+        guest_token = data_json["guest_token"]
+        headers = {
+            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
+            "Authorization": Authorization,
+            "x-guest-token": guest_token
+        }
+        result = requests.post("https://twitter.com/i/api/1.1/branch/init.json", headers=headers)
+        if(result.status_code == 200):
+            return guest_token
+        else:
+            pass
+    print("Getting new guest_token...")
+    headers = {
+        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
+        "Authorization": Authorization
+    }
+    result = requests.post("https://api.twitter.com/1.1/guest/activate.json", headers=headers)
+    result.raise_for_status()
+    guest_token = json.loads(result.text)["guest_token"]
+    f = open(program_directory_path + "/guest_token.json", 'w')
+    f.write('{"guest_token":"' + guest_token + '"}')
+    f.close()
+    return guest_token
+
 input_url = input("Tweet URL: ")
 input_url_parsed = urllib.parse.urlparse(input_url)
 if(input_url_parsed.netloc == "twitter.com"):
@@ -16,21 +56,16 @@ if(input_url_parsed.netloc == "twitter.com"):
 else:
     sys.exit(1)
 
-Authorization = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'
-guest_token_age = 10800
-guest_token_expires = int(time.time()) + guest_token_age
+Authorization = get_authorization()
+guest_token = get_guest_token(Authorization)
 
 headers = {
-    'Authorization': Authorization
-}
-result = requests.post("https://api.twitter.com/1.1/guest/activate.json", headers=headers)
-guest_token = json.loads(result.text)["guest_token"]
-
-headers = {
-    'Authorization': Authorization,
-    'x-guest-token': guest_token
+    "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
+    "Authorization": Authorization,
+    "x-guest-token": guest_token
 }
 result = requests.get("https://api.twitter.com/1.1/statuses/show/" + tweet_id + ".json?cards_platform=Web-12&include_cards=1&include_reply_count=1&include_user_entities=0&tweet_mode=extended", headers=headers)
+result.raise_for_status()
 result_json = json.loads(result.text)
 for media_index, media in enumerate(result_json["extended_entities"]["media"]):
     media_type = media["type"]
@@ -42,7 +77,7 @@ for media_index, media in enumerate(result_json["extended_entities"]["media"]):
             else:
                 variants_bitrate.append(-1)
         media_url = media["video_info"]["variants"][variants_bitrate.index(max(variants_bitrate))]["url"]
-        print(media_url)
+        #print(media_url)
         r = requests.get(media_url, stream=True, timeout=10)
         r.raise_for_status()
         pbar = tqdm(total=int(r.headers["content-length"]), unit="B", unit_scale=True)
@@ -54,7 +89,7 @@ for media_index, media in enumerate(result_json["extended_entities"]["media"]):
             file.close()
     elif(media_type == "photo"):
         media_url = media["media_url_https"] + "?name=orig"
-        print(media_url)
+        #print(media_url)
         r = requests.get(media_url, stream=True, timeout=10)
         r.raise_for_status()
         pbar = tqdm(total=int(r.headers["content-length"]), unit="B", unit_scale=True)
